@@ -347,17 +347,20 @@
 </button>
 
 
-<button
-  v-for="p in pages"
-  :key="p"
-  :class="{ active: p === currentPage }"
-  @click="
-    currentPage = p;
-    scrollToTop();
-  "
->
-  {{ p }}
-</button>
+<template v-for="(p, idx) in pages" :key="`${p}-${idx}`">
+  <button
+    v-if="p !== '...'"
+    :class="{ active: p === currentPage }"
+    @click="
+      currentPage = p;
+      scrollToTop();
+    "
+  >
+    {{ p }}
+  </button>
+
+  <span v-else class="page-dots">…</span>
+</template>
 
 
 
@@ -806,7 +809,7 @@
     <button class="modal-close" @click="showCategoryModal = false">✕</button>
 
     <h3 class="export-title"> {{ $t('modal.chooseCategory') }}</h3>
-
+    
     <div class="categories">
       <div
   v-for="c in categories"
@@ -1160,11 +1163,44 @@ function removeItem(i) {
 }
 
 const pages = computed(() => {
-  return Array.from(
-    { length: totalPages.value },
-    (_, i) => i + 1
-  )
+  const tp = totalPages.value
+  const cp = currentPage.value
+  const DOT = '...'
+  const WINDOW = 4 // số trang hiển thị liền nhau trên mobile
+
+  // Desktop → full
+  if (!isMobile.value) {
+    return Array.from({ length: tp }, (_, i) => i + 1)
+  }
+
+  // Ít trang → show hết
+  if (tp <= WINDOW + 1) {
+    return Array.from({ length: tp }, (_, i) => i + 1)
+  }
+
+  // ===== SLIDING WINDOW =====
+  let start = cp
+  let end = cp + WINDOW - 1
+
+  // Không vượt quá trang cuối
+  if (end >= tp) {
+    end = tp
+    start = Math.max(1, tp - WINDOW + 1)
+  }
+
+  const range = []
+  for (let i = start; i <= end; i++) {
+    range.push(i)
+  }
+
+  // Nếu chưa chạm cuối → thêm ...
+  if (end < tp) {
+    range.push(DOT, tp)
+  }
+
+  return range
 })
+
 const menuKey = computed(() => {
   return `${keyword.value}-${currentCategory.value}-${currentPage.value}`
 })
@@ -1602,10 +1638,16 @@ watch(
 
 
 const khuyenMaiNoiDung = computed(() =>
-  khuyenMaiInfo.value
-    .map((k) => k.Noi_dung)
-    .filter(Boolean)
+  [
+    ...new Set(
+      khuyenMaiInfo.value
+        .filter(k => k.Ma_nha_cung_cap === maNCC)
+        .map(k => (k.Noi_dung || '').trim())
+        .filter(Boolean)
+    )
+  ]
 )
+
 function buildSendLink(c) {
   const text = encodeURIComponent(exportText.value)
 
@@ -5357,6 +5399,13 @@ filter: saturate(1.15);
   to {
     --angle: 360deg;
   }
+}
+.page-dots{
+  color:#fff;
+  font-weight:900;
+  padding:0 6px;
+  opacity:.8;
+  user-select:none;
 }
 
 </style>
